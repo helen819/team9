@@ -7,7 +7,7 @@ import pydata_google_auth
 
 # 연결 정보
 # bigquery
-project_id = "teak-serenity-403905" # team 공통으로 구성 후 변경 필요!
+project_id = "teak-serenity-403905"
 # postgres
 connection_info = "host=147.47.200.145 dbname=teamdb9 user=team9 password=aplus port=34543"
 # neo4j
