@@ -1,34 +1,21 @@
+import common
 import streamlit as st
 import sqlite3
 import hashlib
 
-conn = sqlite3.connect('data.db', check_same_thread=False)
-c = conn.cursor()
-
-def create_usertable():
-    c.execute('DROP TABLE IF EXISTS userstable')  # 기존 테이블 삭제
-    c.execute('CREATE TABLE userstable(username TEXT, userid TEXT, password TEXT)')  # 새로운 테이블 생성
-
-def create_buildingtable():
-    c.execute('CREATE TABLE IF NOT EXISTS buildingtable(userid TEXT, address TEXT, price REAL)')
-
 def add_userdata(username, userid, password):
-    c.execute('INSERT INTO userstable(username, userid, password) VALUES (?, ?, ?)', (username, userid, password))
-    conn.commit()
+    common.postgres_update(f"INSERT INTO users(name, id, password) VALUES ('{username}', '{userid}', '{password}')")
 
 def add_buildingdata(userid, address, price):
-    c.execute('INSERT INTO buildingtable(userid, address, price) VALUES (?, ?, ?)', (userid, address, price))
-    conn.commit()
+    common.postgres_update(f"INSERT INTO building(userid, address, price) VALUES ('{userid}', '{address}','{price}' )")
 
 def login_user(userid, password):
-    c.execute('SELECT * FROM userstable WHERE userid =? AND password = ?', (userid, password))
-    data = c.fetchall()
-    return data
+    response = common.postgres_select(f"SELECT * FROM users WHERE id ='{userid}' AND password = '{password}'")
+    return len(response)>0
 
 def check_user(userid):
-    c.execute('SELECT * FROM userstable WHERE username =? OR userid = ?', (userid))
-    data = c.fetchall()
-    return len(data) > 0
+    response = common.postgres_select(f"SELECT * FROM users WHERE id = '{userid}'")
+    return len(response)>0
 
 def main():
     st.title("건물공유중개 및 가격예측서비스")
@@ -40,6 +27,7 @@ def main():
         st.session_state['userid'] = None
 
     if choice == "Home":
+
         if st.session_state['userid']:
             st.subheader(f"Welcome {st.session_state['userid']}")
         else:
@@ -51,7 +39,6 @@ def main():
         userid = st.sidebar.text_input("User ID")
         password = st.sidebar.text_input("Password", type='password')
         if st.sidebar.button("Login"):
-            create_usertable()
             hashed_pswd = hashlib.sha256(password.encode('utf-8')).hexdigest()
             result = login_user(userid, hashed_pswd)
             if result:
@@ -71,7 +58,6 @@ def main():
             if check_user(new_userid):
                 st.warning("이미 존재하는 사용자 ID입니다.")
             else:
-                create_usertable()
                 add_userdata(new_user, new_userid, hashlib.sha256(new_password.encode('utf-8')).hexdigest())
                 st.success("회원가입에 성공했습니다!")
                 st.info("Go to Login Menu to login")
