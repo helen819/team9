@@ -7,7 +7,7 @@ import pydata_google_auth
 
 # 연결 정보
 # bigquery
-project_id = "teak-serenity-403905"
+project_id = "team9-404702"
 # postgres
 connection_info = "host=147.47.200.145 dbname=teamdb9 user=team9 password=aplus port=34543"
 # neo4j
