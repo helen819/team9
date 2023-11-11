@@ -2,8 +2,10 @@ import common
 import streamlit as st
 import sqlite3
 import hashlib
+from geopy.geocoders import ArcGIS
 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, ColumnsAutoSizeMode
 import pandas as pd
+import matplotlib.pyplot as plt
 
 def add_userdata(username, userid, password):
     common.postgres_update(f"INSERT INTO users(name, id, password) VALUES ('{username}', '{userid}', '{password}')")
