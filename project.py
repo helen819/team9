@@ -8,8 +8,33 @@ import pandas as pd
 def add_userdata(username, userid, password):
     common.postgres_update(f"INSERT INTO users(name, id, password) VALUES ('{username}', '{userid}', '{password}')")
 
-def add_buildingdata(userid, address, price):
-    common.postgres_update(f"INSERT INTO building(userid, address, price) VALUES ('{userid}', '{address}','{price}' )")
+def add_buildingdata(username, address, price):
+    common.postgres_update(f"INSERT INTO transactions(seller, building, price) VALUES ('{username}', '{address}', price)")
+    return True
+
+
+def price_prediction(address):
+    # 데이터베이스 쿼리 결과를 가져옴
+    result = common.postgres_select(f"SELECT price, year1, year2, year3, year5, year10 FROM building WHERE loc='{address}'")
+    if result:
+        # 데이터 추출
+        data = result[0]  # 여기서는 첫 번째 행을 사용합니다
+        building_year=common.postgres_select(f"SELECT year FROM building WHERE loc='{address}'")
+        years = [f'최근거래연도{building_year}','1 year', '2 years', '3 years', '5 years', '10 years']
+        values = [data[0], data[1], data[2], data[3], data[4], data[5]]
+
+        # 꺾은선 그래프 생성
+        plt.figure()
+        plt.plot(years, values, marker='o')
+        plt.title(f"Price Prediction for {address}")
+        plt.xlabel("Years")
+        plt.ylabel("Price")
+        
+        # Streamlit에 그래프 표시
+        st.pyplot(plt)
+    else:
+        st.write("No data available for this address")
+
 
 def login_user(userid, password):
     response = common.postgres_select(f"SELECT * FROM users WHERE id ='{userid}' AND password = '{password}'")
@@ -29,7 +54,7 @@ def get_buildings_with_address(address) :
 def main():
     st.title("건물공유중개 및 가격예측서비스")
 
-    menu = ["Home", "Login", "SignUp", "Add Building Info", "매물 조회"]
+    menu = ["Home", "Login", "SignUp", "Add Building Info", "가격예측서비스", "매물 조회"]
     choice = st.sidebar.selectbox("Menu", menu)
 
     if 'userid' not in st.session_state:
@@ -53,7 +78,6 @@ def main():
             if result:
                 st.session_state['userid'] = userid
                 st.success("로그인에 성공했습니다!")
-                st.experimental_rerun()
             else:
                 st.warning("잘못된 사용자 ID 또는 비밀번호입니다.")
 
@@ -74,13 +98,27 @@ def main():
     elif choice == "Add Building Info":
         st.subheader("Add Your Building Information")
         if st.session_state['userid']:
-            address = st.text_input("Building Address")
-            price = st.number_input("Desired Price", step=1000.0, format="%f")
+            address = st.text_input("건물주소(읍면동)")
+            price = st.number_input("매매희망가격(원)", step=1000000.0, format="%f")
             if st.button("Submit"):
-                add_buildingdata(st.session_state['userid'], address, price)
-                st.success("Building Information Added Successfully")
+                if add_buildingdata(st.session_state['userid'], address, price):
+                    st.success("건물정보가 성공적으로 입력되었습니다.")
+                else:
+                    st.error("주소를 찾을 수 없습니다.")
         else:
-            st.warning("Please Login First to Add Building Information")
+            st.warning("먼저 로그인을 하세요.")
+
+    elif choice == "가격예측서비스":
+        st.subheader("예측하고자 하는 건물의 주소를 입력하세요")
+        if st.session_state['userid']:
+            address = st.text_input("건물주소(읍면동)")
+            if st.button("Submit"):
+                if price_prediction(st.session_state['userid'], address):
+                    st.success("건물정보가 성공적으로 입력되었습니다.")
+                else:
+                    st.error("주소를 찾을 수 없습니다.")
+        else:
+            st.warning("먼저 로그인을 하세요.")
 
     elif choice == "매물 조회" :
 
