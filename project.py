@@ -47,13 +47,6 @@ def check_user(userid):
     response = common.postgres_select(f"SELECT * FROM users WHERE id = '{userid}'")
     return len(response)>0
 
-def get_buildings() :
-    return common.postgres_select(f"SELECT * FROM transactions t, building b WHERE t.building = b.loc and t.buyer IS NULL ORDER BY t.register_date desc limit 100")
-
-def get_buildings_with_address(address) :
-    return common.postgres_select(f"SELECT * FROM transactions t, building b WHERE t.building = b.loc and t.building like '%{address}%'")
-
-
 def main():
     st.title("건물공유중개 및 가격예측서비스")
 
