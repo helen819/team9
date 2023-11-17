@@ -9,12 +9,183 @@ import matplotlib.pyplot as plt
 import numpy as np
 import folium
 from streamlit_folium import st_folium, folium_static
+import random
+
+seoul_address = {}
 
 def get_buildings() :
     return common.postgres_select(f"SELECT * FROM transactions t, building b WHERE t.building = b.loc and t.buyer IS NULL ORDER BY t.register_date desc limit 100")
 
 def get_buildings_with_address(address) :
     return common.postgres_select(f"SELECT * FROM transactions t, building b WHERE t.building = b.loc and t.building like '%{address}%'")
+
+def get_address2_select_option() :
+    return common.postgres_select(f"""select
+                                            distinct address2
+                                        from
+                                            address a
+                                        where
+                                            address2 != ''
+                                        order by address2;""")
+
+def get_address3_select_option(address2) :
+    return common.postgres_select(f"""select
+                                            distinct address3
+                                        from
+                                            address a
+                                        where
+                                            address2 = '{address2}'
+                                        order by address3;""")
+
+def get_transaction_strength_by_address3() :
+    return common.postgres_select(f"""select sub.*, a.center_lat ,a.center_lng 
+                                    from (
+                                    select
+                                        split_part(b.loc,' ', 1) as address1,
+                                        split_part(b.loc,' ', 2) as address2,
+                                        split_part(b.loc,' ', 3) as address3,
+                                        count(*) as strength
+                                    from
+                                        building b,
+                                        transactions t
+                                    where
+                                        b.loc = t.building
+                                    and t.conclusion_date is null
+                                    group by
+                                        split_part(b.loc,' ', 1),
+                                        split_part(b.loc,' ', 2),
+                                        split_part(b.loc,' ', 3)
+                                        ) as sub, address a
+                                    where sub.address1 = a.address1  and sub.address2 = a.address2 and sub.address3 = a.address3 ;  """)
+
+def get_buildings_with_seperate_address1(address1) :
+    return common.postgres_select(f"""select
+                                        *
+                                    from
+                                        building b,
+                                        transactions t,
+                                        address a
+                                    where
+                                        b.loc = t.building
+                                    and a.address1  = split_part(b.loc,' ', 1)
+                                    and a.address2  = split_part(b.loc,' ', 2)
+                                    and a.address3  = split_part(b.loc,' ', 3)
+                                    and t.conclusion_date is null
+                                    and split_part(b.loc,' ', 1) = '{address1}';  """)  
+
+def get_buildings_with_seperate_address2(address1, address2) :
+    return common.postgres_select(f"""select
+                                        *
+                                    from
+                                        building b,
+                                        transactions t,
+                                        address a
+                                    where
+                                        b.loc = t.building
+                                    and a.address1  = split_part(b.loc,' ', 1)
+                                    and a.address2  = split_part(b.loc,' ', 2)
+                                    and a.address3  = split_part(b.loc,' ', 3)
+                                    and t.conclusion_date is null
+                                    and split_part(b.loc,' ', 1) = '{address1}'
+                                    and split_part(b.loc,' ', 2) = '{address2}';  """)  
+
+def get_buildings_with_seperate_address3(address1, address2, address3) :
+    return common.postgres_select(f"""select
+                                        *
+                                    from
+                                        building b,
+                                        transactions t,
+                                        address a
+                                    where
+                                        b.loc = t.building
+                                    and a.address1  = split_part(b.loc,' ', 1)
+                                    and a.address2  = split_part(b.loc,' ', 2)
+                                    and a.address3  = split_part(b.loc,' ', 3)
+                                    and t.conclusion_date is null
+                                    and split_part(b.loc,' ', 1) = '{address1}'
+                                    and split_part(b.loc,' ', 2) = '{address2}'
+                                    and split_part(b.loc,' ', 3) = '{address3}';  """)   
+
+def change_address3():
+    st.session_state['읍/면/동'] = get_address3_select_option(st.session_state.key2)
+    st.session_state['읍/면/동'].loc[0] = "읍/면/동"
+
+def dashboard():
+    submitted = ""
+
+    # st.markdown("##### 찾으려는 매물의 주소를 입력하세요.")
+    col1, col2, col3, col4 = st.columns([2,2,2,1])
+
+    select2_option = get_address2_select_option()
+    select2_option.loc[0] = "군/구"
+    with col1:
+        key1 = st.selectbox(placeholder="서울특별시", label="address1", label_visibility="collapsed", options=["서울특별시"])
+    with col2:
+        key2 = st.selectbox(placeholder="군/구", label="address2", label_visibility='collapsed', options=select2_option, on_change=change_address3, key="key2")
+    with col3:
+        key3 = st.selectbox(placeholder="읍/면/동", label="address3", label_visibility='collapsed', options=st.session_state['읍/면/동'])
+    with col4:
+        submitted = st.button("검색")
+
+    seoul_lat = 37.56661
+    seoul_lng = 126.978386
+
+    if submitted :
+        df = ""
+        zoom_start = 11
+        if key2 == '군/구': 
+            df = get_buildings_with_seperate_address1(key1)
+        elif key3 == '읍/면/동' :
+            df = get_buildings_with_seperate_address2(key1, key2)
+            zoom_start = 13
+        else :
+            df = get_buildings_with_seperate_address3(key1, key2, key3)
+            zoom_start = 13
+        
+        if df.shape[0] > 0:
+            seoul_lat = df.iloc[0]['center_lat']
+            seoul_lng = df.iloc[0]['center_lng']
+
+        map = folium.Map(location=[seoul_lat, seoul_lng], zoom_start=zoom_start, tiles = 'cartodbpositron')
+
+        for i, each in df.iterrows():
+            html = f"""
+                    {each['loc']}
+                    """
+            folium.Circle([each['lat'], each['lng']],
+                    color = "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)]),
+                    # fill_color = "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)]),
+                    fill= True,
+                    radius=100,
+                    fill_opacity= 0.8,
+                    tooltip=html
+                    ).add_to(map)
+        folium_static(map)
+
+    else :
+        map = folium.Map(location=[seoul_lat, seoul_lng], zoom_start=11, tiles = 'cartodbpositron')
+        df = st.session_state['대시보드_지도'] 
+        if df is None :
+            df = get_transaction_strength_by_address3()
+            st.session_state['대시보드_지도'] = df
+            color_list = []
+            for i in range(df.shape[0]) :
+                color_list.append("#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)]))
+            st.session_state['대시보드_지도_색깔'] = color_list
+        for i, each in df.iterrows():
+            html = f"""
+                    {each['address3']}, 매물 {each['strength']}건 
+                    """
+            folium.Circle([each['center_lat'], each['center_lng']],
+                    color = st.session_state['대시보드_지도_색깔'][i],
+                    # fill_color = "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)]),
+                    fill= True,
+                    radius=1000*each['strength'],
+                    fill_opacity= 0.8,
+                    tooltip=html
+                    ).add_to(map)
+            
+        folium_static(map)
 
 def building_select():
     if st.session_state['userid'] == None:
@@ -85,7 +256,8 @@ def building_select():
         allow_unsafe_jscode=True,
         update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.MODEL_CHANGED,
         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
-        theme= 'material'
+        theme= 'material',
+        height= 500
     )
 
     selected_rows = data["selected_rows"]
@@ -97,7 +269,7 @@ def building_select():
         query = f"match (s:Station)-[rel]-(b:Building) where b.loc =~ '{selected_rows[0]['주소']}'and rel.distance < 1.5 return s, rel, b order by rel.distance;"
         response = common.run_neo4j(query)
 
-        map = folium.Map(location=[selected_rows[0]['lat'], selected_rows[0]['lng']], zoom_start=14, control_scale=True)
+        map = folium.Map(location=[selected_rows[0]['lat'], selected_rows[0]['lng']], zoom_start=14)
         
         feature_group = folium.FeatureGroup("Locations")
         for i, each in enumerate(response):

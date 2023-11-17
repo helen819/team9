@@ -49,13 +49,20 @@ def check_user(userid):
     return len(response)>0
 
 def main():
-    st.title("건물공유중개 및 가격예측서비스")
+    # st.title("건물공유중개 및 가격예측서비스")
 
     if 'userid' not in st.session_state:
         st.session_state['userid'] = None
 
     if '매물' not in st.session_state:
         st.session_state['매물'] = None
+
+    if '읍/면/동' not in st.session_state :
+        st.session_state['읍/면/동'] = ['읍/면/동']
+
+    if '대시보드_지도' not in st.session_state :
+        st.session_state['대시보드_지도'] = None
+        st.session_state['대시보드_지도_색깔'] = None
 
     menu = ["대시보드", "로그인", "회원가입", "매물 등록", "가격예측서비스", "매물 조회"]
     icon = ['house', 'person-check', 'person-add', 'building-add', 'card-checklist' , 'building']
@@ -82,11 +89,7 @@ def main():
     # choice = st.sidebar.selectbox("Menu", menu)
 
     if choice == "대시보드":
-
-        if st.session_state['userid']:
-            st.subheader(f"Welcome {st.session_state['userid']}")
-        else:
-            st.subheader("Home")
+        ft.dashboard()
 
     elif choice == "로그인":
         st.subheader("Login Section")
