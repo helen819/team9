@@ -10,6 +10,7 @@ import numpy as np
 import folium
 from streamlit_folium import st_folium, folium_static
 import random
+import altair as alt
 
 seoul_address = {}
 
@@ -106,6 +107,24 @@ def get_buildings_with_seperate_address3(address1, address2, address3) :
                                     and split_part(b.loc,' ', 2) = '{address2}'
                                     and split_part(b.loc,' ', 3) = '{address3}';  """)   
 
+def get_transaction_count_by_address2() :
+    return common.postgres_select(f"""select
+                                        split_part(b.loc, ' ', 1) as address1,
+                                        split_part(b.loc, ' ', 2) as address2,
+                                        count(*)
+                                    from
+                                        building b,
+                                        transactions t
+                                    where
+                                        b.loc = t.building
+                                         and t.conclusion_date is null
+                                    group by
+                                        split_part(b.loc, ' ', 1),
+                                        split_part(b.loc, ' ', 2)
+                                  order by
+                                        count(*) desc
+                                    limit 5;""")   
+    
 def change_address3():
     st.session_state['읍/면/동'] = get_address3_select_option(st.session_state.key2)
     st.session_state['읍/면/동'].loc[0] = "읍/면/동"
@@ -186,6 +205,44 @@ def dashboard():
                     ).add_to(map)
             
         folium_static(map)
+
+    st.markdown("")
+    col1, col2 = st.columns(2)
+
+    with col1 :
+        st.markdown("##### 시/군/구별 거래 건수 Top 5")
+        df_left = get_transaction_count_by_address2()
+        df_left = df_left.rename(columns={
+                                        'address1' : '시/도', 
+                                        'address2' : '시/군/구', 
+                                        'count' : '거래 건수'})
+        chart = alt.Chart(df_left).mark_bar().encode(
+            x='시/군/구',
+            y='거래 건수',
+            color= '시/군/구'
+        ).configure_axisX(labelAngle=0).configure_legend(disable=True)
+        st.altair_chart(chart, theme='streamlit', use_container_width=True)
+
+        
+        st.dataframe(df_left, use_container_width=True, hide_index= True)
+
+    with col2 :
+        # TODO : 가격 상승률로 변경해야 함
+        st.markdown("##### 시/군/구별 1년뒤 가격상승률 Top 5")
+        df_right = get_transaction_count_by_address2()
+        df_right = df_right.rename(columns={
+                                        'address1' : '시/도', 
+                                        'address2' : '시/군/구', 
+                                        'count' : '상승률 평균'})
+        chart = alt.Chart(df_right).mark_bar().encode(
+            x='시/군/구',
+            y='상승률 평균',
+            color= '시/군/구',
+        ).configure_axisX(labelAngle=0).configure_legend(disable=True)
+        st.altair_chart(chart, theme='streamlit', use_container_width=True)
+
+        st.dataframe(df_right, use_container_width=True, hide_index= True)
+
 
 def building_select():
     if st.session_state['userid'] == None:
