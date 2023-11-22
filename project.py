@@ -72,6 +72,8 @@ def main():
         del menu[1]
         del icon[1]
         del icon[1]
+        menu.insert(1, '내 거래내역')
+        icon.insert(1, 'person-lines-fill')
     
     with st.sidebar:
         choice = option_menu("메뉴", menu,
@@ -79,7 +81,7 @@ def main():
                             menu_icon="list", 
                             default_index=0,
                             styles={
-            "container": {"padding": "4!important", "background-color": "#fafafa"},
+            "container": {"padding": "0", "background-color": "#fafafa"},
             "icon": {"color": "black", "font-size": "20px"},
             "nav-link": {"font-size": "15px", "text-align": "left", "margin":"0px", "--hover-color": "#fafafa"},
             "nav-link-selected": {"background-color": "#d8d9f0", "color": "black"},
@@ -147,6 +149,10 @@ def main():
 
     elif choice == "매물 조회" :
         ft.building_select()
+    
+    elif choice == "내 거래내역" :
+        ft.my_info()
 
 if __name__ == '__main__':
+    st.set_page_config(page_title="건물공유중개 및 가격예측서비스",initial_sidebar_state="auto")
     main()

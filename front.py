@@ -11,6 +11,8 @@ import folium
 from streamlit_folium import st_folium, folium_static
 import random
 import altair as alt
+from itertools import cycle
+from PIL import Image
 
 seoul_address = {}
 
@@ -133,8 +135,29 @@ def dashboard():
     submitted = ""
 
     # st.markdown("##### 찾으려는 매물의 주소를 입력하세요.")
+    
+    st.markdown("""
+    <style>
+        div.st-emotion-cache-ocqkz7.e1f1d6gn4 {
+            border : 1px solid black;
+            padding-top : 10px;
+            padding-bottom : 10px;
+            padding-left : 20px;
+            padding-right : 20px;
+        }
+                
+        [data-testid="stIFrame"]{
+            border : 1px solid black;
+        }
+            
+        [data-testid="stArrowVegaLiteChart"]{
+            range : "diverging";
+        }    
+    </style>
+    """, unsafe_allow_html=True)
+    
     col1, col2, col3, col4 = st.columns([2,2,2,1])
-
+    
     select2_option = get_address2_select_option()
     select2_option.loc[0] = "군/구"
     with col1:
@@ -145,7 +168,6 @@ def dashboard():
         key3 = st.selectbox(placeholder="읍/면/동", label="address3", label_visibility='collapsed', options=st.session_state['읍/면/동'])
     with col4:
         submitted = st.button("검색")
-
     seoul_lat = 37.56661
     seoul_lng = 126.978386
 
@@ -210,38 +232,40 @@ def dashboard():
     col1, col2 = st.columns(2)
 
     with col1 :
-        st.markdown("##### 시/군/구별 거래 건수 Top 5")
-        df_left = get_transaction_count_by_address2()
-        df_left = df_left.rename(columns={
-                                        'address1' : '시/도', 
-                                        'address2' : '시/군/구', 
-                                        'count' : '거래 건수'})
-        chart = alt.Chart(df_left).mark_bar().encode(
-            x='시/군/구',
-            y='거래 건수',
-            color= '시/군/구'
-        ).configure_axisX(labelAngle=0).configure_legend(disable=True)
-        st.altair_chart(chart, theme='streamlit', use_container_width=True)
+        with st.container() :
+            st.markdown("##### 시/군/구별 거래 건수 Top 5")
+            df_left = get_transaction_count_by_address2()
+            df_left = df_left.rename(columns={
+                                            'address1' : '시/도', 
+                                            'address2' : '시/군/구', 
+                                            'count' : '거래 건수'})
+            chart = alt.Chart(df_left).mark_bar().encode(
+                x='시/군/구',
+                y=alt.Y('거래 건수', scale=alt.Scale(domain=[0, df_left.loc[0,'거래 건수'] +1 ], clamp=True)),
+                color= '시/군/구'
+            ).configure_axisX(labelAngle=0).configure_legend(disable=True).configure_range("diverging")
+            st.altair_chart(chart, theme='streamlit', use_container_width=True)
 
-        
-        st.dataframe(df_left, use_container_width=True, hide_index= True)
+            
+            st.dataframe(df_left, use_container_width=True, hide_index= True)
 
     with col2 :
-        # TODO : 가격 상승률로 변경해야 함
-        st.markdown("##### 시/군/구별 1년뒤 가격상승률 Top 5")
-        df_right = get_transaction_count_by_address2()
-        df_right = df_right.rename(columns={
-                                        'address1' : '시/도', 
-                                        'address2' : '시/군/구', 
-                                        'count' : '상승률 평균'})
-        chart = alt.Chart(df_right).mark_bar().encode(
-            x='시/군/구',
-            y='상승률 평균',
-            color= '시/군/구',
-        ).configure_axisX(labelAngle=0).configure_legend(disable=True)
-        st.altair_chart(chart, theme='streamlit', use_container_width=True)
+         with st.container() :
+            # TODO : 가격 상승률로 변경해야 함
+            st.markdown("##### 시/군/구별 1년뒤 가격상승률 Top 5")
+            df_right = get_transaction_count_by_address2()
+            df_right = df_right.rename(columns={
+                                            'address1' : '시/도', 
+                                            'address2' : '시/군/구', 
+                                            'count' : '상승률 평균'})
+            chart = alt.Chart(df_right).mark_bar().encode(
+                x='시/군/구',
+                y=alt.Y('상승률 평균', scale=alt.Scale(domain=[0, df_right.loc[0,'상승률 평균'] +1 ], clamp=True)),
+                color= '시/군/구',
+            ).configure_axisX(labelAngle=0).configure_legend(disable=True).configure_range("diverging")
+            st.altair_chart(chart, theme='streamlit', use_container_width=True)
 
-        st.dataframe(df_right, use_container_width=True, hide_index= True)
+            st.dataframe(df_right, use_container_width=True, hide_index= True)
 
 
 def building_select():
@@ -365,11 +389,17 @@ def building_select():
 
             # TODO : 건물 가격 그래프를 여기에 넣어야 하나?
 
+            filteredImages = ['1.png','2.png','3.png','4.png','5.png','6.png'] # your images here
+            cols = cycle(st.columns(3)) # st.columns here since it is out of beta at the time I'm writing this
+            for idx, filteredImage in enumerate(filteredImages):
+                image = Image.open(filteredImage)
+                new_image = image.resize((400, 600))
+                next(cols).image(new_image, use_column_width=True)
+
             col1, col2 = st.columns([5, 1])
             button = ""
             with col2 :
                 button = st.button("계약 체결")
-
             if button:
                 # TODO : 구현 필요
                 pass
@@ -417,3 +447,40 @@ def building_select():
                 st.markdown("###### ?? 일자")
                 st.markdown(f"{selected_rows[0]['?? 일자']}") 
 
+def my_info() :
+    # TODO : DB에서 조회하는 것으로 변경
+    st.markdown("#### 내 거래내역")
+    df = pd.DataFrame({'주소' : ['서울특별시 강남구 역삼동 830-59번지', '서울특별시 강남구 청담동 38-1번지'], '상태' : ['거래 완료','매물 등록'],'매물 등록일자' : ['2022-11-23', '2023-11-20'], '거래 완료일자' : ['2023-01-01',' '], '매매 희망가' : ['5억 4321만원','60억'], '체결 금액' :['5억 4321만원',' '] })
+    st.dataframe(df,hide_index=True, use_container_width=True)
+
+    st.container()
+    st.markdown("#### 보험료 납입내역")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1 :
+        st.markdown("###### 거래 체결 금액")
+        st.markdown("5억 4321만원")
+    with col2 :
+        st.markdown("###### 예측 가격")
+        st.markdown("6억 4321만원")
+    with col3 :
+        st.markdown("###### 현재 가격")
+        st.markdown("5억 9321만원")
+    with col4 :
+        st.markdown("###### 보험료 총 납입 금액")
+        st.markdown("1100만원")
+    
+    col1, col2= st.columns([4,6])
+    with col2 :
+        st.markdown("##### 받으실 수 있는 보험금은 총 ???만원입니다.")
+
+    df2 = pd.DataFrame({ '주소' : ['서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지'], 
+                        '납입 일자' : ['2023-11-01','2023-10-01','2023-09-01','2023-08-01','2023-07-01','2023-06-01','2023-05-01','2023-04-01','2023-03-01','2023-02-01','2023-01-01'],
+                        '납입 금액' : ['100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원']})
+    st.dataframe(df2,hide_index=True, use_container_width=True)
+    col1, col2 = st.columns([5, 1])
+    button = ""
+    with col2 :
+        button = st.button("보험금 청구")
+    if button:
+        # TODO : 구현 필요
+        pass
