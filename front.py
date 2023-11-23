@@ -23,7 +23,7 @@ def get_buildings_with_address(address) :
     return common.postgres_select(f"SELECT * FROM transactions t, building b WHERE t.building = b.loc and t.building like '%{address}%'")
 
 def get_address2_select_option() :
-    return common.postgres_select(f"""select
+    return common.postgres_select("""select
                                             distinct address2
                                         from
                                             address a
@@ -41,7 +41,7 @@ def get_address3_select_option(address2) :
                                         order by address3;""")
 
 def get_transaction_strength_by_address3() :
-    return common.postgres_select(f"""select sub.*, a.center_lat ,a.center_lng 
+    return common.postgres_select("""select sub.*, a.center_lat ,a.center_lng 
                                     from (
                                     select
                                         split_part(b.loc,' ', 1) as address1,
@@ -110,7 +110,7 @@ def get_buildings_with_seperate_address3(address1, address2, address3) :
                                     and split_part(b.loc,' ', 3) = '{address3}';  """)   
 
 def get_transaction_count_by_address2() :
-    return common.postgres_select(f"""select
+    return common.postgres_select("""select
                                         split_part(b.loc, ' ', 1) as address1,
                                         split_part(b.loc, ' ', 2) as address2,
                                         count(*)
@@ -135,26 +135,6 @@ def dashboard():
     submitted = ""
 
     # st.markdown("##### 찾으려는 매물의 주소를 입력하세요.")
-    
-    st.markdown("""
-    <style>
-        div.st-emotion-cache-ocqkz7.e1f1d6gn4 {
-            border : 1px solid black;
-            padding-top : 10px;
-            padding-bottom : 10px;
-            padding-left : 20px;
-            padding-right : 20px;
-        }
-                
-        [data-testid="stIFrame"]{
-            border : 1px solid black;
-        }
-            
-        [data-testid="stArrowVegaLiteChart"]{
-            range : "diverging";
-        }    
-    </style>
-    """, unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns([2,2,2,1])
     
@@ -226,13 +206,12 @@ def dashboard():
                     tooltip=html
                     ).add_to(map)
             
-        folium_static(map)
+        folium_static(map)  
 
-    st.markdown("")
     col1, col2 = st.columns(2)
-
     with col1 :
         with st.container() :
+            
             st.markdown("##### 시/군/구별 거래 건수 Top 5")
             df_left = get_transaction_count_by_address2()
             df_left = df_left.rename(columns={

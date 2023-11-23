@@ -155,4 +155,6 @@ def main():
 
 if __name__ == '__main__':
     st.set_page_config(page_title="건물공유중개 및 가격예측서비스",initial_sidebar_state="auto")
+    with open('style.css') as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     main()
