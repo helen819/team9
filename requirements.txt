@@ -1,0 +1,9 @@
+numpy
+pandas
+streamlit
+matplotlib
+geopy
+streamlit-aggrid
+folium
+streamlit-folium
+streamlit-option-menu
