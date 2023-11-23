@@ -10,6 +10,10 @@ import pydata_google_auth
 project_id = "team9-404702"
 # postgres
 connection_info = "host=147.47.200.145 dbname=teamdb9 user=team9 password=aplus port=34543"
+keepalives=1,
+keepalives_idle=30,
+keepalives_interval=10,
+keepalives_count=5
 # neo4j
 dbname = "teamdb9"
 uri_param = "bolt://147.47.200.145:37687"
@@ -29,6 +33,7 @@ def run_bigquery(query):
 # postgres select 수행
 def postgres_select(query):
     try:
+        print(query)
         conn = psycopg2.connect(connection_info)
         df = pd.read_sql(query,conn)
     except psycopg2.Error as e:

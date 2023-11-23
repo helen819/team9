@@ -430,36 +430,55 @@ def my_info() :
     # TODO : DB에서 조회하는 것으로 변경
     st.markdown("#### 내 거래내역")
     df = pd.DataFrame({'주소' : ['서울특별시 강남구 역삼동 830-59번지', '서울특별시 강남구 청담동 38-1번지'], '상태' : ['거래 완료','매물 등록'],'매물 등록일자' : ['2022-11-23', '2023-11-20'], '거래 완료일자' : ['2023-01-01',' '], '매매 희망가' : ['5억 4321만원','60억'], '체결 금액' :['5억 4321만원',' '] })
-    st.dataframe(df,hide_index=True, use_container_width=True)
+    # st.dataframe(df,hide_index=True, use_container_width=True)
 
-    st.container()
-    st.markdown("#### 보험료 납입내역")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1 :
-        st.markdown("###### 거래 체결 금액")
-        st.markdown("5억 4321만원")
-    with col2 :
-        st.markdown("###### 예측 가격")
-        st.markdown("6억 4321만원")
-    with col3 :
-        st.markdown("###### 현재 가격")
-        st.markdown("5억 9321만원")
-    with col4 :
-        st.markdown("###### 보험료 총 납입 금액")
-        st.markdown("1100만원")
-    
-    col1, col2= st.columns([4,6])
-    with col2 :
-        st.markdown("##### 받으실 수 있는 보험금은 총 ???만원입니다.")
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_selection(selection_mode="single")
+    gridOptions = gb.build()
 
-    df2 = pd.DataFrame({ '주소' : ['서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지'], 
-                        '납입 일자' : ['2023-11-01','2023-10-01','2023-09-01','2023-08-01','2023-07-01','2023-06-01','2023-05-01','2023-04-01','2023-03-01','2023-02-01','2023-01-01'],
-                        '납입 금액' : ['100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원']})
-    st.dataframe(df2,hide_index=True, use_container_width=True)
-    col1, col2 = st.columns([5, 1])
-    button = ""
-    with col2 :
-        button = st.button("보험금 청구")
-    if button:
-        # TODO : 구현 필요
-        pass
+    data = AgGrid(
+        df,
+        gridOptions=gridOptions,
+        enable_enterprise_modules=True,
+        allow_unsafe_jscode=True,
+        update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.MODEL_CHANGED,
+        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+        theme= 'material',
+        height= 300
+    )
+
+    selected_rows = data["selected_rows"]
+
+    if len(selected_rows) != 0 :
+
+        if selected_rows[0]['상태'] == '거래 완료':
+            st.markdown("#### 보험료 납입내역")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1 :
+                st.markdown("###### 거래 체결 금액")
+                st.markdown("5억 4321만원")
+            with col2 :
+                st.markdown("###### 예측 가격")
+                st.markdown("6억 4321만원")
+            with col3 :
+                st.markdown("###### 현재 가격")
+                st.markdown("5억 9321만원")
+            with col4 :
+                st.markdown("###### 보험료 총 납입 금액")
+                st.markdown("1100만원")
+            
+            col1, col2= st.columns([4,6])
+            with col2 :
+                st.markdown("##### 받으실 수 있는 보험금은 총 ???만원입니다.")
+
+            df2 = pd.DataFrame({ '주소' : ['서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지','서울특별시 강남구 역삼동 830-59번지'], 
+                                '납입 일자' : ['2023-11-01','2023-10-01','2023-09-01','2023-08-01','2023-07-01','2023-06-01','2023-05-01','2023-04-01','2023-03-01','2023-02-01','2023-01-01'],
+                                '납입 금액' : ['100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원','100만원']})
+            st.dataframe(df2,hide_index=True, use_container_width=True)
+            col1, col2 = st.columns([5, 1])
+            button = ""
+            with col2 :
+                button = st.button("보험금 청구")
+            if button:
+                # TODO : 구현 필요
+                pass
