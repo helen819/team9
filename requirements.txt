@@ -7,3 +7,5 @@ streamlit-aggrid
 folium
 streamlit-folium
 streamlit-option-menu
+webdriver_manager
+selenium

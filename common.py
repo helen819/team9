@@ -4,6 +4,11 @@ import psycopg2
 from neo4j import GraphDatabase
 from pandas.io import gbq
 import pydata_google_auth
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+import time
+from datetime import datetime
 
 # 연결 정보
 # bigquery
@@ -33,7 +38,7 @@ def run_bigquery(query):
 # postgres select 수행
 def postgres_select(query):
     try:
-        print(query)
+        # print(query)
         conn = psycopg2.connect(connection_info)
         df = pd.read_sql(query,conn)
     except psycopg2.Error as e:
@@ -93,3 +98,33 @@ def run_neo4j(cypher) :
     conn.close()
     return response
 
+def croll_economy():
+    date = datetime.today().strftime("%Y%m") 
+    
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    
+    url = 'https://www.korcham.net/nCham/Service/EconBrief/appl/ProspectList.asp'
+    # driver = webdriver.Chrome("chromedriver.exe", options=options)
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.get(url)
+    time.sleep(1)
+    # cold_rate = driver.find_elements_by_xpath('/html/body/div/div[2]/section/div/table/tbody/tr[2]/td[5]')[0].text
+    cold_rate = driver.find_elements('/html/body/div/div[2]/section/div/table/tbody/tr[2]/td[5]')[0].text
+
+    url = 'https://ecos.bok.or.kr/#/'
+    # driver = webdriver.Chrome("chromedriver.exe", options=options)
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.get(url)
+    time.sleep(1)
+    # m2 = driver.find_elements_by_xpath('/html/body/div[1]/div[5]/div/div[2]/div[2]/div/div[1]/ul/li[5]/div/div/span[2]/span[1]')[0].text
+    m2 = driver.find_elements('/html/body/div[1]/div[5]/div/div[2]/div[2]/div/div[1]/ul/li[5]/div/div/span[2]/span[1]')[0].text
+    
+    query = f"""
+    INSERT INTO public.economy
+    ("date", call_rate, "m2")
+    VALUES('{date}', '{cold_rate}', '{m2}');
+    """
+    return query
