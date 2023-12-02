@@ -395,6 +395,52 @@ def caculate_payback(minus,building, insurance_userid) :
                                         and payment_complete = 'Y';
                                     """)
 
+def update_building_price(price, address) :
+    common.postgres_update(f"""insert
+                                into
+                                building 
+                                (
+                                select
+                                    loc,
+                                    how,
+                                    main_how,
+                                    road_condition,
+                                    area1,
+                                    area2,
+                                    "year",
+                                    {price*10},
+                                    land_ratio,
+                                    floor_ratio,
+                                    up_floor,
+                                    under_floor,
+                                    building_area,
+                                    '{datetime.today().strftime("%Y%m%d")}',
+                                    road_name,
+                                    pnu,
+                                    lat,
+                                    lng,
+                                    year1,
+                                    year2,
+                                    year3,
+                                    year4,
+                                    year5,
+                                    year6,
+                                    year7,
+                                    year8,
+                                    year9,
+                                    year10
+                                from
+                                    building
+                                where
+                                    loc = '{address}'
+                                    and tran_day = (
+                                    select
+                                        max(tran_day)
+                                    from
+                                        building b
+                                    where
+                                        loc = '{address}'));""")
+    
 def change_address3():
     st.session_state['읍/면/동'] = get_address3_select_option(st.session_state.key2)
     st.session_state['읍/면/동'].loc[0] = "읍/면/동"
@@ -983,49 +1029,3 @@ def contract() :
         st.session_state['보험유형'] = None
         st.session_state['건물'] = get_buildings()
         st.rerun()
-
-def update_building_price(price, address) :
-    common.postgres_update(f"""insert
-                                into
-                                building 
-                                (
-                                select
-                                    loc,
-                                    how,
-                                    main_how,
-                                    road_condition,
-                                    area1,
-                                    area2,
-                                    "year",
-                                    {price*10},
-                                    land_ratio,
-                                    floor_ratio,
-                                    up_floor,
-                                    under_floor,
-                                    building_area,
-                                    '{datetime.today().strftime("%Y%m%d")}',
-                                    road_name,
-                                    pnu,
-                                    lat,
-                                    lng,
-                                    year1,
-                                    year2,
-                                    year3,
-                                    year4,
-                                    year5,
-                                    year6,
-                                    year7,
-                                    year8,
-                                    year9,
-                                    year10
-                                from
-                                    building
-                                where
-                                    loc = '{address}'
-                                    and tran_day = (
-                                    select
-                                        max(tran_day)
-                                    from
-                                        building b
-                                    where
-                                        loc = '{address}'));""")
