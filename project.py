@@ -31,6 +31,16 @@ def add_userdata(username, userid, password):
 def add_buildingdata(username, address, price, register_date):
     common.postgres_update(f"INSERT INTO transactions(seller, building, expected_selling_price, register_date) VALUES ('{username}', '{address}', {price},'{register_date}')")
 
+def get_address3(address) :
+    return common.postgres_select(f"""
+                                    select
+                                        distinct split_part(loc,' ',3) as address3
+                                    from
+                                        building
+                                    where
+                                        loc = '{address}';
+                                    """)
+
 def change_address3():
     st.session_state['읍/면/동'] = ft.get_address3_select_option(st.session_state.key2)
     st.session_state['읍/면/동'].loc[0] = "읍/면/동"
@@ -55,15 +65,18 @@ def price_prediction(address):
                             building
                         where
                             loc like '%{address}%'
-                            and tran_day >='20230101';
+                            and year1 is not null 
+                            and year1 !=0;
                         """
         price_info = common.postgres_select(price_query)
 
         price_before_query=f"SELECT price, tran_day From building where loc like '%{address}%' order by tran_day asc;"
         price_before_info = common.postgres_select(price_before_query)
-
-        # 청담동에 해당하는 모든 건물의 데이터 쿼리
-        cheongdam_query = f"""
+        
+        address3 = str(get_address3(address).iloc[0]['address3'])
+        
+        # 동에 해당하는 모든 건물의 데이터 쿼리
+        address3_query = f"""
                         select
                             price,
                             year1,
@@ -79,22 +92,22 @@ def price_prediction(address):
                         from
                             building
                         where
-                            loc like '%청담동%'
-                            and tran_day >='20230101';
+                            split_part(loc, ' ', 3) = '{address3}'
+                            and year1 is not null 
+                            and year1 !=0;
                         """
-        cheongdam_info = common.postgres_select(cheongdam_query)
-        
+        address3_avg_info = common.postgres_select(address3_query)
 
         # 원래 건물 가격 예측 그래프
         price_data = price_info.iloc[0]
 
-        # 청담동 데이터의 평균 계산
-        avg_cheongdam = cheongdam_info.mean()
+        # 동 데이터의 평균 계산
+        avg_address3 = address3_avg_info.mean()
 
         # 이전 거래 데이터 처리
         years = ['1년후', '2년후', '3년후', '4년후', '5년후', '6년후', '7년후', '8년후', '9년후', '10년후']
         values = [price_data['year1'], price_data['year2'], price_data['year3'], price_data['year4'], price_data['year5'], price_data['year6'], price_data['year7'], price_data['year8'], price_data['year9'], price_data['year10']]
-        avg_values = [avg_cheongdam['year1'], avg_cheongdam['year2'], avg_cheongdam['year3'], avg_cheongdam['year4'], avg_cheongdam['year5'], avg_cheongdam['year6'], avg_cheongdam['year7'], avg_cheongdam['year8'], avg_cheongdam['year9'], avg_cheongdam['year10']]
+        avg_values = [avg_address3['year1'], avg_address3['year2'], avg_address3['year3'], avg_address3['year4'], avg_address3['year5'], avg_address3['year6'], avg_address3['year7'], avg_address3['year8'], avg_address3['year9'], avg_address3['year10']]
 
         # 이전 거래일자와 가격 추가
         num_previous_data = len(price_before_info)
@@ -130,13 +143,13 @@ def price_prediction(address):
 
         # 선 그래프 생성
         plt.figure()
-        plt.plot(x[:num_previous_data], values[:num_previous_data], linestyle='-', marker='o', color='blue')
-        plt.plot(xnew2, f_values(xnew2), linestyle='--', label=f"{address} 거래가격", color='blue')
-        plt.plot(xnew, f_avg_values(xnew), linestyle='--', linewidth=2, label="청담동 평균 예측", color='red')
-        plt.scatter(x, values, color='blue')  # 원래 데이터 포인트에만 마커 표시
-        plt.scatter(x, avg_values, color='red')  # 원래 데이터 포인트에만 마커 표시
+        plt.plot(x[:num_previous_data], values[:num_previous_data], linestyle='-', marker='o', color='#6469b0')
+        plt.plot(xnew2, f_values(xnew2), linestyle='--', label=f"{address} 거래가격", color='#6469b0')
+        plt.plot(xnew, f_avg_values(xnew), linestyle='--', linewidth=2, label=f"{address3} 평균 예측", color='#bd97b3')
+        plt.scatter(x, values, color='#6469b0')  # 원래 데이터 포인트에만 마커 표시
+        plt.scatter(x, avg_values, color='#bd97b3')  # 원래 데이터 포인트에만 마커 표시
         plt.xticks(ticks=x, labels=years)  # X축 눈금 설정
-        plt.title(f"{address} 및 청담동 평균 가격 비교")
+        plt.title(f"{address} 및 {address3} 평균 가격 비교")
         plt.xlabel("거래연도 및 예측시점")
         plt.ylabel("예상가격(천만)")
         plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(formatter))
@@ -164,7 +177,7 @@ def check_building(address1, address2, address3, address4):
 
 def check_transaction_building(building) :
     return common.postgres_select(f"""
-                                    select * from transactions where building = '{building}';
+                                    select * from transactions where building = '{building}' and buyer is null;
                                     """)
 
 def login_user(userid, password):
@@ -185,9 +198,9 @@ def set_session_state():
     if '읍/면/동' not in st.session_state :
         st.session_state['읍/면/동'] = ['읍/면/동']
 
-    if '대시보드_지도' not in st.session_state :
-        st.session_state['대시보드_지도'] = None
-        st.session_state['대시보드_지도_색깔'] = None
+    # if '대시보드_지도' not in st.session_state :
+    #     st.session_state['대시보드_지도'] = None
+    #     st.session_state['대시보드_지도_색깔'] = None
 
     if '계약 체결' not in st.session_state :
         st.session_state['계약 체결'] = None
@@ -197,12 +210,10 @@ def set_session_state():
     if '보험유형' not in st.session_state :
         st.session_state['보험유형'] = None
 
+    if '가입 가능' not in st.session_state :
+        st.session_state['가입 가능'] = 'Y'
+
 def main():
-    # st.title("건물공유중개 및 가격예측서비스")
-
-    # menu = ["Home", "Login", "SignUp", "Add Building Info", "가격예측서비스", "매물 조회"]
-    # choice = st.sidebar.selectbox("Menu", menu)
-
     set_session_state()
 
     menu = ["메인", "로그인", "회원가입", "매물 등록", "건물 조회"]
@@ -263,8 +274,7 @@ def main():
                 st.warning("이미 존재하는 사용자 ID입니다.")
             else:
                 add_userdata(new_user, new_userid, hashlib.sha256(new_password.encode('utf-8')).hexdigest())
-                st.success("회원가입에 성공했습니다!")
-                st.info("로그인을 해주세요.")
+                st.success("회원가입에 성공했습니다! 로그인을 해주세요.")
             
     elif choice == "매물 등록":
         st.subheader("매물 등록")
@@ -284,15 +294,14 @@ def main():
             price = st.text_input("매매희망가격(만원)")
             if st.button("입력"):
                 building = check_building(key1, key2, key3, address)
-
+                
                 if len(building) == 1 :    
-                    print(building.iloc[0]['loc'])
                     if price.isdecimal() :
                         building2 = check_transaction_building(building.iloc[0]['loc'])
                         if len(building2) == 0 :
                             add_buildingdata(st.session_state['userid'], building.iloc[0]['loc'], int(price), datetime.today().strftime("%Y-%m-%d"))
                             st.success("건물정보가 성공적으로 입력되었습니다.")
-                            st.rerun()
+                            st.session_state['건물'] = None
                         else :
                             st.warning("이미 매물로 등록된 건물입니다.")
                     else :
@@ -301,7 +310,7 @@ def main():
                 elif len(building) > 1 :
                     st.warning("하나 이상의 건물이 존재합니다. 정확한 건물 정보를 입력해 주세요.")
                 else :
-                    st.warning("해당 건물이 존재하지 않습니다.")
+                    st.warning("해당 건물이 존재하지 않습니다. 주소를 확인해주세요.")
         else:
             st.warning("먼저 로그인을 하세요.")
 
@@ -310,13 +319,32 @@ def main():
         with cent_co:
             st.image('호갱님노노.jpg', use_column_width=True)
         st.subheader("예측하고자 하는 건물의 주소를 입력하세요")
-        address = st.text_input("건물주소(읍면동)")
-        if st.button("Submit"):
-            if price_prediction(address):
-                pass
-                # st.success("건물정보가 성공적으로 입력되었습니다.")
-            else:
-                st.error("주소를 찾을 수 없습니다.")
+        col1, col2, col3 = st.columns(3)
+
+        select2_option = ft.get_address2_select_option()
+        select2_option.loc[0] = "군/구"
+        with col1:
+            key1 = st.selectbox(placeholder="서울특별시", label="시/도", label_visibility="collapsed", options=["서울특별시"])
+        with col2:
+            key2 = st.selectbox(placeholder="군/구", label="군/구", label_visibility='collapsed', options=select2_option, on_change=change_address3, key="key2")
+        with col3:
+            key3 = st.selectbox(placeholder="읍/면/동", label="읍/면/동", label_visibility='collapsed', options=st.session_state['읍/면/동'])
+        
+        address = st.text_input("상세주소", label_visibility="collapsed") 
+        
+        col1, col2 = st.columns([8,2])
+        with col2 :
+            btn = st.button("가격예측", use_container_width=True)
+        if btn:
+            building = check_building(key1, key2, key3, address)
+
+            if len(building) == 1 :    
+                price_prediction(building.iloc[0]['loc'])
+            elif len(building) > 1 :
+                st.warning("하나 이상의 건물이 존재합니다. 정확한 건물 정보를 입력해 주세요.")
+            else :
+                st.warning("해당 건물이 존재하지 않습니다. 주소를 확인해주세요.")
+
 
     elif choice == "건물 조회" :
         ft.building_select()

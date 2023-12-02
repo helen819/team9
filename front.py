@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import folium
+import folium.features
 from streamlit_folium import st_folium, folium_static
 import random
 import altair as alt
@@ -16,9 +17,11 @@ from PIL import Image
 import math
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+import project
+import os
 
 radio1 = "권리조사 및 법무사 과실담보"
-radio2 = "예측치 차이 손실 담보"
+radio2 = "예측결과 정확도 담보"
 radio3 = "보험 가입 안함"
 
 def get_buildings() :
@@ -34,8 +37,10 @@ def get_buildings() :
                                         transactions t
                                     right outer join building as b on
                                         t.building = b.loc
+                                    where year1 is not null
+                                      and year1 != 0
                                     order by
-                                        t.register_date, b.tran_day desc
+                                        t.conclusion_date, t.register_date, b.tran_day desc
                                     limit 200;                                
                                     """)
 
@@ -53,8 +58,10 @@ def get_buildings_with_address(address) :
                                     right outer join building as b on
                                         t.building = b.loc
                                     where b.loc like '%{address}%'
+                                      and year1 is not null
+                                      and year1 != 0
                                     order by
-                                        t.register_date, b.tran_day desc;
+                                        t.conclusion_date, t.register_date, b.tran_day desc ;
                                   """)
 
 def get_address2_select_option() :
@@ -336,7 +343,9 @@ def select_my_info_buyer(userid) :
                                             when conclusion is not null then '거래 완료' end as status
                                         from
                                             transactions t 
-                                        where buyer = '{userid}';""")
+                                        where buyer = '{userid}'
+                                        order by
+                                        t.conclusion_date desc;""")
 
 def select_my_info_seller(userid) :
     return common.postgres_select(f"""
@@ -359,7 +368,7 @@ def select_insurance(building, insurance_userid) :
                                         insurance_userid = '{insurance_userid}'
                                         and building = '{building}'
                                     order by
-                                        payment_date desc;
+                                        payment_date;
                                     """)
 def select_total_amount(building, insurance_userid) :
     return common.postgres_select(f"""
@@ -369,7 +378,8 @@ def select_total_amount(building, insurance_userid) :
                                         insurance
                                     where
                                         insurance_userid = '{insurance_userid}'
-                                        and building = '{building}';
+                                        and building = '{building}'
+                                        and payment_complete = 'Y';
                                     """)
 
 def caculate_payback(minus,building, insurance_userid) :
@@ -381,7 +391,8 @@ def caculate_payback(minus,building, insurance_userid) :
                                         insurance
                                     where
                                         insurance_userid = '{insurance_userid}'
-                                        and building = '{building}';
+                                        and building = '{building}'
+                                        and payment_complete = 'Y';
                                     """)
 
 def change_address3():
@@ -403,6 +414,14 @@ def convert_price(price, include_0 = False) :
         if include_0 is True and price == 0:
             temp = temp + str(int(price)) +'만원'
     return temp 
+
+def check_max_value() :
+    if st.session_state.key4 > int(st.session_state["계약 빌딩"]['expected_selling_price']*0.1) :
+        st.session_state["가입 가능"] = 'N'
+    elif st.session_state.key4 <= 0 :
+        st.session_state["가입 가능"] = 'N'
+    else :
+        st.session_state["가입 가능"] = 'Y'
 
 # def dashboard():
 #     submitted = ""
@@ -581,13 +600,14 @@ def building_select():
 
     for i, row in df_display.iterrows():
         price = row['expected_selling_price']
-        if not math.isnan(price):
-            row['매매 희망가'] = convert_price(price)
-            df_display.iloc[i] = row
+        if price is not None and not math.isnan(price) :
+            if row['매물'] != '거래 완료' :
+                row['매매 희망가'] = convert_price(price)
         price = row['price']
-        if not math.isnan(price):
-            row['실거래가'] = convert_price(price)
-            df_display.iloc[i] = row
+        if price is not None and not math.isnan(price) :
+            row['실거래가'] = convert_price(price)  
+        row['실거래 일자'] = str(row['실거래 일자'])[0:4]+"-"+str(row['실거래 일자'])[4:6] +"-"+str(row['실거래 일자'])[6:]
+        df_display.iloc[i] = row
 
     gb = GridOptionsBuilder.from_dataframe(df_display[["주소", "매물", "실거래가", "매매 희망가"]])
     gb.configure_selection(selection_mode="single")
@@ -609,32 +629,56 @@ def building_select():
     if len(selected_rows) != 0:
 
         # 지도
-        # 1.5km 미만인 지하철역 표시
-        query = f"match (s:Station)-[rel]-(b:Building) where b.loc =~ '{selected_rows[0]['주소']}'and rel.distance < 1.5 return s, rel, b order by rel.distance;"
-        response = common.run_neo4j(query)
+        # 1.5km 미만
+        query1 = f"match (s:Station)-[rel]-(b:Building) where b.loc =~ '{selected_rows[0]['주소']}'and rel.distance < 1.5 return s, rel, b order by rel.distance;"
+        response1 = common.run_neo4j(query1)
+    
+        query2 = f"match (s:Starbucks)-[rel]-(b:Building) where b.loc =~ '{selected_rows[0]['주소']}'and rel.distance < 1.5 return s, rel, b order by rel.distance;"
+        response2 = common.run_neo4j(query2)
 
-        map = folium.Map(location=[selected_rows[0]['lat'], selected_rows[0]['lng']], zoom_start=14)
-        
-        feature_group = folium.FeatureGroup("Locations")
-        for i, each in enumerate(response):
+        query3 = f"match (h:Hotel)-[rel]-(b:Building) where b.loc =~ '{selected_rows[0]['주소']}'and rel.distance < 1.5 return h, rel, b order by rel.distance;"
+        response3 = common.run_neo4j(query3)
+
+        map = folium.Map(location=[selected_rows[0]['lat'], selected_rows[0]['lng']], zoom_start=14, tiles = 'cartodbpositron')
+
+        subway_icon_path = os.getcwd() + r"\subway.png"
+        starbucks_icon_path = os.getcwd() + r"\starbucks.png"
+        hotel_icon_path = os.getcwd() + r"\hotel.png"
+
+        for i, each in enumerate(response1):
             stname = each['s']['stname']
             if stname.strip()[-1] != '역' :
                 stname = stname + '역'
             distance = str(round(each['rel']['distance'],2)) + 'km'
             html = f"""
                 {stname}, {distance} 
-                """
-            feature_group.add_child(folium.Marker(location=[each['s']['lat'],each['s']['lng']], tooltip=html))
-            feature_group.add_child(folium.Marker(location=[each['b']['lat'],each['b']['lng']], icon= folium.Icon(color = 'red'), tooltip=selected_rows[0]['주소']))
-        map.add_child(feature_group)
+                """         
+            folium.Marker(location=[each['s']['lat'],each['s']['lng']], icon= folium.features.CustomIcon(icon_image=subway_icon_path,icon_size=(40,40)), tooltip=html).add_to(map)
+            folium.Marker(location=[each['b']['lat'],each['b']['lng']], icon= folium.Icon(color = 'darkpurple', icon='building', prefix='fa'), tooltip=selected_rows[0]['주소']).add_to(map)
 
+        for i, each in enumerate(response2):
+            sbname = each['s']['sbname']
+            distance = str(round(each['rel']['distance'],2)) + 'km'
+            html = f"""
+                {sbname}, {distance} 
+                """         
+            folium.Marker(location=[each['s']['lat'],each['s']['lng']], icon= folium.features.CustomIcon(icon_image=starbucks_icon_path,icon_size=(30,30)), tooltip=html).add_to(map)
+        
+        for i, each in enumerate(response3):
+            hname = each['h']['hname']
+            distance = str(round(each['rel']['distance'],2)) + 'km'
+            html = f"""
+                {hname}, {distance} 
+                """         
+            folium.Marker(location=[each['h']['lat'],each['h']['lng']], icon= folium.features.CustomIcon(icon_image=hotel_icon_path,icon_size=(35,35)), tooltip=html).add_to(map)
+        
         folium.Circle([selected_rows[0]['lat'], selected_rows[0]['lng']],
-                color='tomato',
+                color='#bd97b3',
                 radius=1500
               ).add_to(map)
         
         folium_static(map)
-
+        project.price_prediction(selected_rows[0]['주소'])
         tab1, tab2 = st.tabs(["매물 개요","매물 상세"])
         with tab1:
             col1, col2, col3 = st.columns([6,2,2])
@@ -646,13 +690,16 @@ def building_select():
                 if selected_rows[0]['매매 희망가'] != "-" :
                     st.markdown("###### 매매 희망가")
                     st.markdown(f"{selected_rows[0]['매매 희망가']}")
+                else :
+                    st.markdown("###### 실거래가")
+                    st.markdown(f"{selected_rows[0]['실거래가']}")
             with col3:
                 if selected_rows[0]['매매 희망가'] != "-" :
                     st.markdown("###### 매물 등록 일자")
                     st.markdown(f"{selected_rows[0]['매물 등록 일자'][0:10]}")
                 else :
-                    st.markdown("###### 실거래가")
-                    st.markdown(f"{selected_rows[0]['실거래가']}")
+                    st.markdown("###### 실거래 일자")
+                    st.markdown(f"{selected_rows[0]['실거래 일자']}") 
             st.subheader("")
 
             # TODO : 건물 가격 그래프를 여기에 넣어야 하나?
@@ -750,7 +797,8 @@ def my_info() :
         update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.MODEL_CHANGED,
         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
         theme= 'material',
-        height= 300
+        height= 300,
+        key="agrid1"
     )        
 
     st.markdown("##### 구매자")
@@ -782,7 +830,8 @@ def my_info() :
         update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.MODEL_CHANGED,
         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
         theme= 'material',
-        height= 300
+        height= 300,
+        key="agrid2"
     )
 
     selected_rows = data2["selected_rows"]
@@ -790,9 +839,6 @@ def my_info() :
     if len(selected_rows) != 0 :
 
         if selected_rows[0]['상태'] == '거래 완료':
-            
-            expect = int(int(selected_rows[0]['체결 금액']) * 1.2)
-            real = int(int(selected_rows[0]['체결 금액']) * 1.1)
             
             df3 = select_insurance(selected_rows[0]['주소'], st.session_state['userid'])
             df3 = df3.rename(columns={
@@ -802,61 +848,85 @@ def my_info() :
             'payment_complete' : '납입 완료여부'})
 
             for i, each in df3.iterrows():
-                each['납입 (예정)금액'] = convert_price(int(each['납입 (예정)금액']), True)
-                # if each['']
+                each['납입 (예정)금액'] = convert_price(int(each['납입 (예정)금액']))
                 df3.loc[i] = each
 
-            total_df = select_total_amount(selected_rows[0]['주소'], st.session_state['userid'])
-            total = 0
-            if total_df.loc[[0],['total']].empty:
-                total = 0
-            else :
-                total = int(total_df.iloc[0]['total'])
-            payback = 0
-            if expect - real > 0 : # 손실이 존재하고, 그 손실이 total의 120% 이하라면,
-                if expect - real < total * 1.2 :
-                    payback = int(caculate_payback(expect-real, selected_rows[0]['주소'], st.session_state['userid']))
-            
-            expect = convert_price(expect)
-            real = convert_price(real,False)
-
             st.markdown("#### 보험료 납입내역")
-            col1, col2, col3, col4 = st.columns(4)
-            with col1 :
-                st.markdown("###### 거래 체결 금액")
-                st.markdown(f"{convert_price(int(selected_rows[0]['체결 금액']))}")
-            with col2 :
-                st.markdown("###### 예측 가격")
-                st.markdown(f"{expect}")
-            with col3 :
-                st.markdown("###### 현재 가격")
-                st.markdown(f"{real}")
-            with col4 :
-                st.markdown("###### 보험료 총 납입 금액")
-                st.markdown(f"{convert_price(total, True)}")
-        
-            st.markdown("##")
-            col1, col2= st.columns([4,6])
-            with col2 :
-                st.markdown(f"##### 받으실 수 있는 보험금은 총 {convert_price(payback, True)}입니다.")
+            type = df3.iloc[0]['insurance_type']
 
-            st.dataframe(df3[['주소','납입 (예정)일자','납입 (예정)금액','납입 완료여부']],hide_index=True, use_container_width=True)
-            col1, col2 = st.columns([5, 1])
-            button = ""
-            with col2 :
-                if payback == 0 :
-                    button = st.button("보험금 청구")
-                if button:
-                    # TODO : 구현 필요
-                    pass
+            if type == '1' :
+                st.markdown("##### 보험 유형 : "+radio1)
+                df3 = df3.rename(columns={
+                    '납입 (예정)일자' :'납입 일자', 
+                    '납입 (예정)금액' : '납입 금액'})
+                st.dataframe(df3[['납입 일자','납입 금액','납입 완료여부']],hide_index=True, use_container_width=True)
+            elif type == '2' :
+                st.markdown("##### 보험 유형 : "+radio2)
+
+                conslution_date = datetime.strptime(str(selected_rows[0]['거래 완료일자']), '%Y-%m-%d')
+
+                delta = datetime.today() - conslution_date
+                total_df = select_total_amount(selected_rows[0]['주소'], st.session_state['userid'])
+                total = 0
+                if total_df.loc[[0],['total']].empty:
+                    total = 0
+                else :
+                    total = int(total_df.iloc[0]['total'])
+
+                st.markdown("#")
+                st.markdown(f"###### 보험료 총 납입 금액 : {convert_price(total)}")
+
+                if delta.days < 365 : # 1년 미만
+                    st.markdown("###### 고객님이 받으실 수 있는 보험금은 총 0원입니다.")
+                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은 '1년 미만'입니다.")
+                    st.markdown("###### 거래 완료일자 기준 최소 1년 후부터 최대 10년후까지의 예측치에 대한 정확도를 보장드립니다.") 
+                    st.markdown(f"###### {(conslution_date+relativedelta(years=1)).strftime('%Y년 %m월 %d일')}부터는 보험금 청구가 가능하십니다.")
+                    
+                elif delta.days > 365 * 10 : # 10년 초과
+                    st.markdown("###### 고객님이 받으실 수 있는 보험금은 총 0원입니다.")
+                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은 '10년 초과'입니다.")
+                    st.markdown("###### 거래 완료일자 기준 최소 1년 후부터 최대 10년후까지의 예측치에 대한 정확도를 보장드립니다.") 
+                    st.markdown(f"###### 고객님의 보험은 {(conslution_date+relativedelta(years=10)).strftime('%Y년 %m월 %d일')}에 효력이 종료되었습니다.")
+                    
+
+                else : # 보장 가능 기간
+                    year_index = int(delta.days//365)
+                    year_column = "year"+str(year_index)
+                    
+                    expect = convert_price(int(df3.iloc[0][f"{year_column}"]))
+                    expect_lower = convert_price(int(int(df3.iloc[0][f"{year_column}"]) * 0.9))
+                    expect_upper = convert_price(int(int(df3.iloc[0][f"{year_column}"]) * 1.1))
+                    real = convert_price(int(int(selected_rows[0]['체결 금액']) * random.choice([1.05,2])))
+
+                    payback = convert_price(int(total*1.2))
+                    if real >= expect_lower and real<= expect_upper :
+                        payback = convert_price(int(total*0.9))
+
+                    st.markdown(f"###### 고객님이 받으실 수 있는 보험금은 총 {payback}입니다.")
+                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은 '{year_index}년 후'입니다.")
+                    st.markdown(f"###### 해당 매물의 거래 완료일자 기준 {year_index}년 후 예측 가격은 {expect}으로,")
+                    st.markdown(f"###### 예측이 정확하다고 판단하는 구간은 {expect_lower}부터 {expect_upper}까지의 가격입니다.")
+                    
+                    st.markdown("#")
+                    if real >= expect_lower and real<= expect_upper :
+                        st.markdown(f"###### 현재가 {real}은 해당 구간에 포함되므로") 
+                        st.markdown(f"###### 보험료 총 납입금액의 90%인 {payback}을 환급드릴 수 있습니다.")
+                    else :
+                        st.markdown(f"###### 현재가 {real}은 해당 구간에 포함되지 않으므로")
+                        st.markdown(f"###### 보험료 총 납입금액의 120%인 {payback}을 환급드릴 수 있습니다.")
+
+                st.markdown("#")
+                st.dataframe(df3[['납입 (예정)일자','납입 (예정)금액','납입 완료여부']],hide_index=True, use_container_width=True)
+            elif type == '3' :
+                st.markdown("##### 보험 유형 : "+radio3)
+                st.markdown("###### 보험 납입내역이 존재하지 않습니다.")
+
 
 def contract() :
     st.markdown("#### 보험 약관 및 계약 확인 사항")
     st.markdown("##### 보험명 : 호갱님 노노 보험")
-    st.image('보험약관1.jpg', use_column_width=True)
-    # st.text_area("본 보험은 일반 건물 매매 상품에 비해 원금손실 리스크를 낮춰 상품 안정성을 높였습니다. 보험상품에 가입된 건물에서 예측 가격과 실제 가격이 일정 기준 이상 차이가 나 기간 내 예측 가격이 보장가액에 미달할 경우, 차액(원금손실액)을 보험약관에 따라 보상합니다. 단, 위와 같은 보상은 납입한 보험증권당 납입보험료의 120% 한도에서만 진행되며, 납입보험료가 전액 소진된 후에는 보상이 되지 않습니다. 예) 10년 후 예상 가격 1억의 건물이 10년 후 9000만원이 되었고 10년간의 보험료 납입 총합이 500만원이라면, 원금손실액 1000만원에 대해 최대 600만원까지 보상을 받을 수 있습니다.")
-    st.image('보험 안내문.PNG',use_column_width=True)
-    st.image('보험약관2.jpg', use_column_width=True)
+    st.image('보험약관.png', use_column_width=True)
+    st.image('보험 안내문.jpg',use_column_width=True)
 
     st.markdown("# ")
     st.markdown("##### 보험 가입까지 함께 진행하시겠습니까?")
@@ -870,16 +940,19 @@ def contract() :
 
     if st.session_state['보험유형'] == radio1:
         st.markdown("###### 최초 1회 납부하는 보험료를 안내드립니다.")
-        amount = st.text_input("총 납입 금액(만원)", disabled=True, value=int(st.session_state["계약 빌딩"]['expected_selling_price']*0.0015))        
+        amount = st.text_input("총 납입 금액(만원)", disabled=True, value=int(st.session_state["계약 빌딩"]['expected_selling_price']*0.0015),)        
     elif st.session_state['보험유형'] == radio2 :
         st.markdown("###### 계약 체결 후 12개월 분할로 보험료 납부 시, 최대 10년 후까지 보장드립니다.") 
-        amount = st.number_input("총 납입 금액(만원)", step=10.0, format="%f", min_value=10.0)    
+        amount = st.number_input("총 납입 금액(만원)", step=10, format="%d", 
+                                 value = int(st.session_state["계약 빌딩"]['expected_selling_price']*0.1),
+                                 on_change= check_max_value,
+                                 key="key4")    
     elif st.session_state['보험유형'] == radio3 :
         pass
     
     submitted = ""
     cancel = ""
-    col11, col2, col3 = st.columns([6,2,2])
+    col11, col2, col3 = st.columns([4,1,1])
 
     with col2 :
         submitted = st.button("거래 체결")
@@ -887,14 +960,19 @@ def contract() :
         cancel = st.button("거래 취소")
 
     if submitted :
-        # update_transaction(st.session_state['userid'], datetime.today().strftime("%Y-%m-%d"),int(amount), st.session_state['계약 빌딩'])
-        update_transaction(int(amount))
-
-        st.session_state['계약 체결'] = None
-        st.session_state['계약 빌딩'] = None
-        st.session_state['보험유형'] = None
-        st.session_state['건물'] = get_buildings()
-        st.rerun()
+        if st.session_state["가입 가능"] == 'N' :
+            st.warning(f"보험금 설정은 1만원부터 매매가의 10%인 {int(st.session_state['계약 빌딩']['expected_selling_price']*0.1)}만원까지 가능합니다. 다시 입력해주시기 바랍니다.")
+        else :
+            try :
+                update_transaction(int(amount))
+                update_building_price(int(amount), st.session_state['계약 빌딩']['주소'] )
+            except :
+                st.error("DB error")
+            st.session_state['계약 체결'] = None
+            st.session_state['계약 빌딩'] = None
+            st.session_state['보험유형'] = None
+            st.session_state['건물'] = get_buildings()
+            st.rerun()
 
     if cancel :
         st.session_state['계약 체결'] = None
@@ -902,4 +980,49 @@ def contract() :
         st.session_state['보험유형'] = None
         st.session_state['건물'] = get_buildings()
         st.rerun()
-    
+
+def update_building_price(price, address) :
+    common.postgres_update(f"""insert
+                                into
+                                building 
+                                (
+                                select
+                                    loc,
+                                    how,
+                                    main_how,
+                                    road_condition,
+                                    area1,
+                                    area2,
+                                    "year",
+                                    {price},
+                                    land_ratio,
+                                    floor_ratio,
+                                    up_floor,
+                                    under_floor,
+                                    building_area,
+                                    {datetime.today().strftime("%Y-%m-%d")},
+                                    road_name,
+                                    pnu,
+                                    lat,
+                                    lng,
+                                    year1,
+                                    year2,
+                                    year3,
+                                    year4,
+                                    year5,
+                                    year6,
+                                    year7,
+                                    year8,
+                                    year9,
+                                    year10
+                                from
+                                    building
+                                where
+                                    loc = '{address}'
+                                    and tran_day = (
+                                    select
+                                        max(tran_day)
+                                    from
+                                        building b
+                                    where
+                                        loc = {address});""")
