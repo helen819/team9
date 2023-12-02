@@ -878,13 +878,15 @@ def my_info() :
 
                 if delta.days < 365 : # 1년 미만
                     st.markdown("###### 고객님이 받으실 수 있는 보험금은 총 0원입니다.")
-                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은 '1년 미만'입니다.")
+                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은")
+                    st.markdown(f"###### '1년 미만'입니다.")
                     st.markdown("###### 거래 완료일자 기준 최소 1년 후부터 최대 10년후까지의 예측치에 대한 정확도를 보장드립니다.") 
                     st.markdown(f"###### {(conslution_date+relativedelta(years=1)).strftime('%Y년 %m월 %d일')}부터는 보험금 청구가 가능하십니다.")
                     
                 elif delta.days > 365 * 10 : # 10년 초과
                     st.markdown("###### 고객님이 받으실 수 있는 보험금은 총 0원입니다.")
-                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은 '10년 초과'입니다.")
+                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은")
+                    st.markdown(f"###### '10년 초과'입니다.")
                     st.markdown("###### 거래 완료일자 기준 최소 1년 후부터 최대 10년후까지의 예측치에 대한 정확도를 보장드립니다.") 
                     st.markdown(f"###### 고객님의 보험은 {(conslution_date+relativedelta(years=10)).strftime('%Y년 %m월 %d일')}에 효력이 종료되었습니다.")
                     
@@ -903,7 +905,8 @@ def my_info() :
                         payback = convert_price(int(total*0.9))
 
                     st.markdown(f"###### 고객님이 받으실 수 있는 보험금은 총 {payback}입니다.")
-                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은 '{year_index}년 후'입니다.")
+                    st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은") 
+                    st.markdown(f"###### '{year_index}년 후'입니다.")
                     st.markdown(f"###### 해당 매물의 거래 완료일자 기준 {year_index}년 후 예측 가격은 {expect}으로,")
                     st.markdown(f"###### 예측이 정확하다고 판단하는 구간은 {expect_lower}부터 {expect_upper}까지의 가격입니다.")
                     
@@ -955,9 +958,9 @@ def contract() :
     col11, col2, col3 = st.columns([4,1,1])
 
     with col2 :
-        submitted = st.button("거래 체결")
+        submitted = st.button("계약 체결")
     with col3 : 
-        cancel = st.button("거래 취소")
+        cancel = st.button("계약 취소")
 
     if submitted :
         if st.session_state["가입 가능"] == 'N' :
@@ -966,14 +969,14 @@ def contract() :
             try :
                 update_transaction(int(amount))
                 update_building_price(int(amount), st.session_state['계약 빌딩']['주소'] )
+                print("here", int(amount), st.session_state['계약 빌딩']['주소'])
+                st.session_state['계약 체결'] = None
+                st.session_state['계약 빌딩'] = None
+                st.session_state['보험유형'] = None
+                st.session_state['건물'] = get_buildings()
+                st.rerun()
             except :
                 st.error("DB error")
-            st.session_state['계약 체결'] = None
-            st.session_state['계약 빌딩'] = None
-            st.session_state['보험유형'] = None
-            st.session_state['건물'] = get_buildings()
-            st.rerun()
-
     if cancel :
         st.session_state['계약 체결'] = None
         st.session_state['계약 빌딩'] = None
@@ -994,13 +997,13 @@ def update_building_price(price, address) :
                                     area1,
                                     area2,
                                     "year",
-                                    {price},
+                                    {price*10},
                                     land_ratio,
                                     floor_ratio,
                                     up_floor,
                                     under_floor,
                                     building_area,
-                                    {datetime.today().strftime("%Y-%m-%d")},
+                                    '{datetime.today().strftime("%Y%m%d")}',
                                     road_name,
                                     pnu,
                                     lat,
@@ -1025,4 +1028,4 @@ def update_building_price(price, address) :
                                     from
                                         building b
                                     where
-                                        loc = {address});""")
+                                        loc = '{address}'));""")
