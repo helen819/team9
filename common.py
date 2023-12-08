@@ -112,7 +112,7 @@ def croll_economy():
     driver.get(url)
     time.sleep(1)
     # cold_rate = driver.find_elements_by_xpath('/html/body/div/div[2]/section/div/table/tbody/tr[2]/td[5]')[0].text
-    cold_rate = driver.find_elements('/html/body/div/div[2]/section/div/table/tbody/tr[2]/td[5]')[0].text
+    call_rate = driver.find_elements('xpath','/html/body/div/div[2]/section/div/table/tbody/tr[2]/td[5]')[0].text
 
     url = 'https://ecos.bok.or.kr/#/'
     # driver = webdriver.Chrome("chromedriver.exe", options=options)
@@ -120,11 +120,12 @@ def croll_economy():
     driver.get(url)
     time.sleep(1)
     # m2 = driver.find_elements_by_xpath('/html/body/div[1]/div[5]/div/div[2]/div[2]/div/div[1]/ul/li[5]/div/div/span[2]/span[1]')[0].text
-    m2 = driver.find_elements('/html/body/div[1]/div[5]/div/div[2]/div[2]/div/div[1]/ul/li[5]/div/div/span[2]/span[1]')[0].text
+    # m2 = driver.find_elements('/html/body/div[1]/div[5]/div/div[2]/div[2]/div/div[1]/ul/li[5]/div/div/span[2]/span[1]')[0].text
+    m2 = driver.find_elements('xpath','/html/body/div[1]/div[5]/div/div[2]/div[2]/div/div[1]/ul/li[5]/div/div/span[2]/span[1]')[0].text
     
     query = f"""
     INSERT INTO public.economy
     ("date", call_rate, "m2")
-    VALUES('{date}', '{cold_rate}', '{m2}');
+    VALUES('{date}', '{call_rate}', '{m2}');
     """
     return query

@@ -23,6 +23,11 @@ import os
 radio1 = "권리조사 및 법무사 과실담보"
 radio2 = "예측결과 정확도 담보"
 radio3 = "보험 가입 안함"
+seoul_lat = 37.56661
+seoul_lng = 126.978386
+subway_icon_path = os.getcwd() + r"\subway.png"
+starbucks_icon_path = os.getcwd() + r"\starbucks.png"
+hotel_icon_path = os.getcwd() + r"\hotel.png"
 
 def get_buildings() :
     return common.postgres_select("""
@@ -408,7 +413,7 @@ def update_building_price(price, address) :
                                     area1,
                                     area2,
                                     "year",
-                                    {price*10},
+                                    {price},
                                     land_ratio,
                                     floor_ratio,
                                     up_floor,
@@ -459,6 +464,8 @@ def convert_price(price, include_0 = False) :
             temp = temp + str(int(price)) +'만원'
         if include_0 is True and price == 0:
             temp = temp + str(int(price)) +'만원'
+    if '원' not in temp :
+        temp = temp[:-1] + '원'
     return temp 
 
 def check_max_value() :
@@ -486,8 +493,7 @@ def check_max_value() :
 #         key3 = st.selectbox(placeholder="읍/면/동", label="address3", label_visibility='collapsed', options=st.session_state['읍/면/동'])
 #     with col4:
 #         submitted = st.button("검색")
-#     seoul_lat = 37.56661
-#     seoul_lng = 126.978386
+
 
 #     if submitted :
 #         df = ""
@@ -584,6 +590,42 @@ def check_max_value() :
 
 #             st.dataframe(df_right, use_container_width=True, hide_index= True)
 
+def set_folium():
+    # query5 = f"match (s:Starbucks) return s;"
+    # response5 = common.run_neo4j(query5)
+
+    # query6 = f"match (s:Station) return s;"
+    # response6 = common.run_neo4j(query6)
+
+    # query7 = f"match (h:Hotel) return h;"
+    # response7 = common.run_neo4j(query7)
+
+    map = folium.Map(location=[seoul_lat, seoul_lng], zoom_start=14, tiles = 'cartodbpositron', prefer_canvas=True)
+
+    # for i, each in enumerate(response5):
+    #     sbname = each['s']['sbname']
+    #     html = f"""
+    #         {sbname}
+    #         """        
+    #     folium.Marker(location=[each['s']['lat'],each['s']['lng']], icon= folium.features.CustomIcon(icon_image=starbucks_icon_path,icon_size=(30,30)), tooltip=html).add_to(map)
+
+    # for i, each in enumerate(response6):
+    #     stname = each['s']['stname']
+    #     if stname.strip()[-1] != '역' :
+    #         stname = stname + '역'
+    #     html = f"""
+    #         {stname}
+    #         """    
+    #     folium.Marker(location=[each['s']['lat'],each['s']['lng']], icon= folium.features.CustomIcon(icon_image=subway_icon_path,icon_size=(40,40)), tooltip=html).add_to(map)
+
+    # for i, each in enumerate(response7):
+    #     hname = each['h']['hname']
+    #     html = f"""
+    #         {hname}
+    #         """   
+    #     folium.Marker(location=[each['h']['lat'],each['h']['lng']], icon= folium.features.CustomIcon(icon_image=hotel_icon_path,icon_size=(35,35)), tooltip=html).add_to(map)
+
+    return map
 
 def building_select():
     if st.session_state['userid'] == None:
@@ -670,6 +712,7 @@ def building_select():
         height= 500
     )
 
+    map = set_folium()
     selected_rows = data["selected_rows"]
 
     if len(selected_rows) != 0:
@@ -685,11 +728,11 @@ def building_select():
         query3 = f"match (h:Hotel)-[rel]-(b:Building) where b.loc =~ '{selected_rows[0]['주소']}'and rel.distance < 1.5 return h, rel, b order by rel.distance;"
         response3 = common.run_neo4j(query3)
 
-        map = folium.Map(location=[selected_rows[0]['lat'], selected_rows[0]['lng']], zoom_start=14, tiles = 'cartodbpositron')
+        # query4 = f"match (b:Building) where b.loc <> '{selected_rows[0]['주소']}' return b;"
+        # response4 = common.run_neo4j(query4)
 
-        subway_icon_path = os.getcwd() + r"\subway.png"
-        starbucks_icon_path = os.getcwd() + r"\starbucks.png"
-        hotel_icon_path = os.getcwd() + r"\hotel.png"
+        # map = folium.Map(location=[selected_rows[0]['lat'], selected_rows[0]['lng']], zoom_start=14, tiles = 'cartodbpositron')
+        map.location = [selected_rows[0]['lat'], selected_rows[0]['lng']]
 
         for i, each in enumerate(response1):
             stname = each['s']['stname']
@@ -718,6 +761,9 @@ def building_select():
                 """         
             folium.Marker(location=[each['h']['lat'],each['h']['lng']], icon= folium.features.CustomIcon(icon_image=hotel_icon_path,icon_size=(35,35)), tooltip=html).add_to(map)
         
+        # for i, each in enumerate(response4):
+        #     folium.Marker(location=[each['b']['lat'],each['b']['lng']], icon= folium.Icon(color = 'gray', icon='building', prefix='fa'), tooltip=selected_rows[0]['주소']).add_to(map)
+
         folium.Circle([selected_rows[0]['lat'], selected_rows[0]['lng']],
                 color='#bd97b3',
                 radius=1500
@@ -749,8 +795,8 @@ def building_select():
             st.subheader("")
 
             # TODO : 건물 가격 그래프를 여기에 넣어야 하나?
-
-            filteredImages = ['1.png','2.png','3.png','4.png','5.png','6.png'] # your images here
+            filteredImages = ['7.jpg','8.jpg','9.jpg','10.jpg','11.jpg','12.jpg']
+            
             cols = cycle(st.columns(3)) # st.columns here since it is out of beta at the time I'm writing this
             for idx, filteredImage in enumerate(filteredImages):
                 image = Image.open(filteredImage)
@@ -876,7 +922,7 @@ def my_info() :
         update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.MODEL_CHANGED,
         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
         theme= 'material',
-        height= 300,
+        height= 500,
         key="agrid2"
     )
 
@@ -897,7 +943,7 @@ def my_info() :
                 each['납입 (예정)금액'] = convert_price(int(each['납입 (예정)금액']))
                 df3.loc[i] = each
 
-            st.markdown("#### 보험료 납입내역")
+            st.markdown("#### 보험료 납입내역 및 환급 가능액 안내")
             type = df3.iloc[0]['insurance_type']
 
             if type == '1' :
@@ -941,10 +987,13 @@ def my_info() :
                     year_index = int(delta.days//365)
                     year_column = "year"+str(year_index)
                     
-                    expect = convert_price(int(df3.iloc[0][f"{year_column}"]))
-                    expect_lower = convert_price(int(int(df3.iloc[0][f"{year_column}"]) * 0.9))
-                    expect_upper = convert_price(int(int(df3.iloc[0][f"{year_column}"]) * 1.1))
-                    real = convert_price(int(int(selected_rows[0]['체결 금액']) * random.choice([1.05,2])))
+                    expect = int(df3.iloc[0][f"{year_column}"])
+                    expect_lower = int(int(df3.iloc[0][f"{year_column}"]) * 0.9)
+                    expect_upper = int(int(df3.iloc[0][f"{year_column}"]) * 1.1)
+
+                    real = st.number_input("예상 판매가(만원)", format="%d", 
+                                 value = int(selected_rows[0]['체결 금액']),
+                                 key="key5")    
 
                     payback = convert_price(int(total*1.2))
                     if real >= expect_lower and real<= expect_upper :
@@ -953,15 +1002,15 @@ def my_info() :
                     st.markdown(f"###### 고객님이 받으실 수 있는 보험금은 총 {payback}입니다.")
                     st.markdown(f"###### 거래 완료일자는 {conslution_date.strftime('%Y년 %m월 %d일')}로 현재 일자 {datetime.today().strftime('%Y년 %m월 %d일')} 적용되는 예측 기준은") 
                     st.markdown(f"###### '{year_index}년 후'입니다.")
-                    st.markdown(f"###### 해당 매물의 거래 완료일자 기준 {year_index}년 후 예측 가격은 {expect}으로,")
-                    st.markdown(f"###### 예측이 정확하다고 판단하는 구간은 {expect_lower}부터 {expect_upper}까지의 가격입니다.")
+                    st.markdown(f"###### 해당 매물의 거래 완료일자 기준 {year_index}년 후 예측 가격은 {convert_price(expect)}으로,")
+                    st.markdown(f"###### 예측이 정확하다고 판단하는 구간은 {convert_price(expect_lower)}부터 {convert_price(expect_upper)}까지의 가격입니다.")
                     
                     st.markdown("#")
                     if real >= expect_lower and real<= expect_upper :
-                        st.markdown(f"###### 현재가 {real}은 해당 구간에 포함되므로") 
+                        st.markdown(f"###### 예상 판매가 {convert_price(int(st.session_state.key5))}은 해당 구간에 포함되므로") 
                         st.markdown(f"###### 보험료 총 납입금액의 90%인 {payback}을 환급드릴 수 있습니다.")
                     else :
-                        st.markdown(f"###### 현재가 {real}은 해당 구간에 포함되지 않으므로")
+                        st.markdown(f"###### 예상 판매가 {convert_price(int(st.session_state.key5))}은 해당 구간에 포함되지 않으므로")
                         st.markdown(f"###### 보험료 총 납입금액의 120%인 {payback}을 환급드릴 수 있습니다.")
 
                 st.markdown("#")
@@ -1012,17 +1061,13 @@ def contract() :
         if st.session_state["가입 가능"] == 'N' :
             st.warning(f"보험금 설정은 1만원부터 매매가의 10%인 {int(st.session_state['계약 빌딩']['expected_selling_price']*0.1)}만원까지 가능합니다. 다시 입력해주시기 바랍니다.")
         else :
-            try :
-                update_transaction(int(amount))
-                update_building_price(int(amount), st.session_state['계약 빌딩']['주소'] )
-                print("here", int(amount), st.session_state['계약 빌딩']['주소'])
-                st.session_state['계약 체결'] = None
-                st.session_state['계약 빌딩'] = None
-                st.session_state['보험유형'] = None
-                st.session_state['건물'] = get_buildings()
-                st.rerun()
-            except :
-                st.error("DB error")
+            update_transaction(int(amount))
+            update_building_price(int(st.session_state['계약 빌딩']['expected_selling_price']), st.session_state['계약 빌딩']['주소'] )
+            st.session_state['계약 체결'] = None
+            st.session_state['계약 빌딩'] = None
+            st.session_state['보험유형'] = None
+            st.session_state['건물'] = get_buildings()
+            st.rerun()
     if cancel :
         st.session_state['계약 체결'] = None
         st.session_state['계약 빌딩'] = None

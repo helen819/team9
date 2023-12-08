@@ -70,6 +70,10 @@ def price_prediction(address):
                         """
         price_info = common.postgres_select(price_query)
 
+        if len(price_info) == 0 :
+            st.warning("해당 건물은 건물 예측 서비스를 제공하지 않고 있습니다.")
+            return 
+
         price_before_query=f"SELECT price, tran_day From building where loc like '%{address}%' order by tran_day asc;"
         price_before_info = common.postgres_select(price_before_query)
         
@@ -354,11 +358,14 @@ def main():
     elif choice == "계약 체결" :
         ft.contract()
 
+@st.cache_resource
+def back() :
+    background.run1()
+    background.run2()
+
 if __name__ == '__main__':
     st.set_page_config(page_title="호갱님노노",initial_sidebar_state="auto")
-
-    # with open('style.css') as f:
-    #     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-    # t = background.BackgroundTasks()
-    # t.start()
     main()
+    back()
+
+    

@@ -9,3 +9,6 @@ streamlit-folium
 streamlit-option-menu
 webdriver_manager
 selenium
+schedule
+lightgbm
+xgboost
